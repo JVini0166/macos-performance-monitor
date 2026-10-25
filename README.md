@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/app-icon.png" width="144" alt="Ícone do Performance Monitor" />
+  <img src="https://raw.githubusercontent.com/JVini0166/macos-performance-monitor/master/assets/app-icon.png" width="144" alt="Ícone do Performance Monitor" />
 
   <h1>Performance Monitor</h1>
   <p><strong>A performance do seu Mac, em uma interface feita para ele.</strong></p>
@@ -23,15 +23,15 @@ Um monitor de sistema nativo para macOS, com sidebar translúcida, barra de ferr
 
 Tabela nativa com busca, filtros, ordenação e cores proporcionais ao uso de recursos.
 
-![Aba Processos com aplicativos ordenados por memória, indicadores globais e controles nativos do macOS](docs/screenshots/processos.png)
+![Aba Processos com aplicativos ordenados por memória, indicadores globais e controles nativos do macOS](https://raw.githubusercontent.com/JVini0166/macos-performance-monitor/master/docs/screenshots/processos.jpg)
 
 ### Performance
 
 | CPU por processador lógico | Memória e swap |
 | :--: | :--: |
-| [![Gráficos de CPU por processador lógico e temperatura](docs/screenshots/cpu.png)](docs/screenshots/cpu.png) | [![Uso e composição da memória com métricas de swap](docs/screenshots/memoria.png)](docs/screenshots/memoria.png) |
+| [![Gráficos de CPU por processador lógico e temperatura](https://raw.githubusercontent.com/JVini0166/macos-performance-monitor/master/docs/screenshots/cpu.jpg)](https://raw.githubusercontent.com/JVini0166/macos-performance-monitor/master/docs/screenshots/cpu.jpg) | [![Uso e composição da memória com métricas de swap](https://raw.githubusercontent.com/JVini0166/macos-performance-monitor/master/docs/screenshots/memoria.jpg)](https://raw.githubusercontent.com/JVini0166/macos-performance-monitor/master/docs/screenshots/memoria.jpg) |
 | **Disco: leitura e escrita** | **GPU e memória compartilhada** |
-| [![Painel Disco 0 com atividade, leitura e escrita](docs/screenshots/disco.png)](docs/screenshots/disco.png) | [![Utilização dos engines da GPU e memória compartilhada em uso](docs/screenshots/gpu.png)](docs/screenshots/gpu.png) |
+| [![Painel Disco 0 com atividade, leitura e escrita](https://raw.githubusercontent.com/JVini0166/macos-performance-monitor/master/docs/screenshots/disco.jpg)](https://raw.githubusercontent.com/JVini0166/macos-performance-monitor/master/docs/screenshots/disco.jpg) | [![Utilização dos engines da GPU e memória compartilhada em uso](https://raw.githubusercontent.com/JVini0166/macos-performance-monitor/master/docs/screenshots/gpu.jpg)](https://raw.githubusercontent.com/JVini0166/macos-performance-monitor/master/docs/screenshots/gpu.jpg) |
 
 Capturas reais no macOS, em um Mac com Apple M5. Clique nas imagens da galeria para abrir em tamanho completo. As leituras refletem o momento da captura e dependem do hardware e dos contadores disponíveis.
 
