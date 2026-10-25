@@ -56,7 +56,7 @@ enum DiskReader {
             guard IORegistryEntryGetParentEntry(driver, kIOServicePlane, &parent) == KERN_SUCCESS else { continue }
             defer { IOObjectRelease(parent) }
             let protocolInfo = property(parent, "Protocol Characteristics") as? [String: Any] ?? [:]
-            let connection = protocolInfo["Physical Interconnect"] as? String ?? "Desconhecida"
+            let connection = protocolInfo["Physical Interconnect"] as? String ?? L("Desconhecida")
             // Disk images are IOBlockStorageDrivers too; never count them as physical I/O.
             guard connection != "Virtual Interface", IOObjectConformsTo(parent, "IOHDIXHDDrive") == 0 else { continue }
             let characteristics = property(parent, "Device Characteristics") as? [String: Any] ?? [:]

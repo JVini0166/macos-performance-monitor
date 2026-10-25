@@ -61,7 +61,7 @@ enum ProcessReader {
         guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bsd, Int32(MemoryLayout<proc_bsdinfo>.size)) == MemoryLayout<proc_bsdinfo>.size else { return nil }
         var buffer = [CChar](repeating: 0, count: 1024)
         let length = proc_name(pid, &buffer, UInt32(buffer.count))
-        let name = length > 0 ? String(cString: buffer) : "Processo \(pid)"
+        let name = length > 0 ? String(cString: buffer) : L("Processo \(pid)")
         var usage = rusage_info_v2()
         let success = withUnsafeMutablePointer(to: &usage) {
             $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V2, $0) == 0 }
@@ -129,11 +129,11 @@ enum ProcessReader {
     }
     func terminate(_ item: ProcessSample, force: Bool) {
         guard canTerminate(item), let fresh = ProcessReader.sample(pid: item.pid), fresh.id == item.id, fresh.uid == getuid() else {
-            error = "O processo já encerrou ou não pode ser finalizado por este usuário."
+            error = L("O processo já encerrou ou não pode ser finalizado por este usuário.")
             return
         }
         if kill(item.pid, force ? SIGKILL : SIGTERM) != 0 {
-            error = "Não foi possível encerrar \(item.name): \(String(cString: strerror(errno)))"
+            error = L("Não foi possível encerrar \(item.name): \(String(cString: strerror(errno)))")
         }
     }
 }

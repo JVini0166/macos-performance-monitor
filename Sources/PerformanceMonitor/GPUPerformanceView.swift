@@ -18,7 +18,7 @@ struct GPUPerformanceView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("GPU").font(.system(size: 28, weight: .semibold, design: .rounded))
                     Spacer()
-                    Text(gpu?.name ?? "GPU indisponível").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text(gpu?.name ?? L("GPU indisponível")).font(.system(size: 12)).foregroundStyle(.secondary)
                 }.padding(.top, 24).padding(.bottom, 6)
                 if metrics.gpus.count > 1 {
                     Picker("GPU", selection: $metrics.selectedGPUID) {
@@ -29,65 +29,65 @@ struct GPUPerformanceView: View {
                     ForEach(GPUEngine.allCases) { engine in
                         VStack(alignment: .leading, spacing: 5) {
                             HStack {
-                                Text(engine.rawValue)
+                                Text(L10n.text(engine.rawValue))
                                 Spacer()
-                                Text(gpu?.engines[engine].map { String(format: "%.0f%%", $0) } ?? "—")
+                                Text(gpu?.engines[engine].map { L10n.number("%.0f%%", $0) } ?? "—")
                             }.font(.system(size: 11)).foregroundStyle(.secondary)
                             HistoryGraph(values: metrics.gpuHistory(engine), color: color, maximum: 100, grid: true)
-                                .overlay { if gpu?.engines[engine] == nil { unavailable("Contador indisponível") } }
+                                .overlay { if gpu?.engines[engine] == nil { unavailable(L("Contador indisponível")) } }
                                 .frame(height: 105)
                         }.padding(16).monitorSurface()
                     }
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("Vídeo · Encode / Decode").font(.system(size: 11)).foregroundStyle(.secondary)
-                        Rectangle().fill(.clear).overlay { unavailable("Não exposto pelo driver") }.frame(height: 105)
+                        Text(L("Vídeo · Encode / Decode")).font(.system(size: 11)).foregroundStyle(.secondary)
+                        Rectangle().fill(.clear).overlay { unavailable(L("Não exposto pelo driver")) }.frame(height: 105)
                     }.padding(16).monitorSurface()
                 }
-                HStack { Text("60 segundos"); Spacer(); Text("0 · Escala de utilização: 100%") }.font(.system(size: 10)).foregroundStyle(.secondary)
+                HStack { Text(L("60 segundos")); Spacer(); Text(L("0 · Escala de utilização: 100%")) }.font(.system(size: 10)).foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text(gpu?.unified == true ? "Memória compartilhada da GPU em uso" : "Memória de sistema usada pela GPU")
+                        Text(gpu?.unified == true ? L("Memória compartilhada da GPU em uso") : L("Memória de sistema usada pela GPU"))
                         Spacer()
                         Text(Metrics.bytes(memoryMaximum))
                     }.font(.system(size: 11)).foregroundStyle(.secondary)
                     HistoryGraph(values: metrics.gpuMemoryHistory[metrics.selectedGPUID] ?? [], color: color, maximum: memoryMaximum, grid: true)
                         .frame(height: 85)
-                        .overlay { if gpu?.memoryInUse == nil { unavailable("Contador de memória indisponível") } }
-                    HStack { Text("60 segundos"); Spacer(); Text("0") }.font(.system(size: 10)).foregroundStyle(.secondary)
+                        .overlay { if gpu?.memoryInUse == nil { unavailable(L("Contador de memória indisponível")) } }
+                    HStack { Text(L("60 segundos")); Spacer(); Text("0") }.font(.system(size: 10)).foregroundStyle(.secondary)
                 }.padding(16).monitorSurface()
                 LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)], alignment: .leading, spacing: 14) {
-                    metric("Utilização", gpu?.utilization.map { String(format: "%.0f%%", $0) } ?? "Indisponível")
-                    metric("Memória em uso (driver)", gpu?.memoryInUse.map(Metrics.bytes) ?? "Indisponível")
-                    metric("Memória alocada (driver)", gpu?.memoryAllocated.map(Metrics.bytes) ?? "Indisponível")
-                    metric("Temperatura (máxima)", TemperatureReading.formatted(temperature))
+                    metric(L("Utilização"), gpu?.utilization.map { L10n.number("%.0f%%", $0) } ?? L("Indisponível"))
+                    metric(L("Memória em uso (driver)"), gpu?.memoryInUse.map(Metrics.bytes) ?? L("Indisponível"))
+                    metric(L("Memória alocada (driver)"), gpu?.memoryAllocated.map(Metrics.bytes) ?? L("Indisponível"))
+                    metric(L("Temperatura (máxima)"), TemperatureReading.formatted(temperature))
                 }
                 Color.clear.frame(height: 2)
                 VStack(alignment: .leading, spacing: 10) {
-                    detail("Modelo de memória:", gpu.map { $0.unified ? "Unificada · Compartilhada com a CPU" : "GPU com memória separada" } ?? "—")
-                    detail("Memória dedicada:", gpu?.unified == true ? "Não se aplica à memória unificada" : "Contador indisponível")
-                    detail("RAM física do Mac:", Metrics.bytes(metrics.memoryTotal))
-                    detail("Working set recomendado:", gpu.map { Metrics.bytes($0.recommendedWorkingSet) } ?? "—")
-                    detail("Driver:", gpu?.driver ?? "Indisponível")
-                    detail("Sensores térmicos:", temperature.map { "AppleSMC · " + $0.sensors.joined(separator: ", ") } ?? "Indisponíveis para esta GPU")
+                    detail(L("Modelo de memória:"), gpu.map { $0.unified ? L("Unificada · Compartilhada com a CPU") : L("GPU com memória separada") } ?? "—")
+                    detail(L("Memória dedicada:"), gpu?.unified == true ? L("Não se aplica à memória unificada") : L("Contador indisponível"))
+                    detail(L("RAM física do Mac:"), Metrics.bytes(metrics.memoryTotal))
+                    detail(L("Working set recomendado:"), gpu.map { Metrics.bytes($0.recommendedWorkingSet) } ?? "—")
+                    detail("Driver:", gpu?.driver ?? L("Indisponível"))
+                    detail(L("Sensores térmicos:"), temperature.map { "AppleSMC · " + $0.sensors.joined(separator: ", ") } ?? L("Indisponíveis para esta GPU"))
                 }
                 .padding(20).frame(maxWidth: .infinity, alignment: .leading).monitorSurface()
-                Text("Amostragem de 1 segundo · Contadores globais do driver IOKit. Memória em uso e alocada são contadores distintos e não devem ser somados. O working set recomendado pelo Metal não é VRAM reservada nem um limite rígido. Sensores e contadores variam por hardware e versão do macOS.")
+                Text(L("Amostragem de 1 segundo · Contadores globais do driver IOKit. Memória em uso e alocada são contadores distintos e não devem ser somados. O working set recomendado pelo Metal não é VRAM reservada nem um limite rígido. Sensores e contadores variam por hardware e versão do macOS."))
                     .font(.system(size: 10)).foregroundStyle(.tertiary)
             }.padding(.bottom, 20)
         }
     }
     func unavailable(_ message: String) -> some View {
-        Text(message).font(.system(size: 11)).foregroundStyle(.secondary).padding(10).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        Text(L10n.text(message)).font(.system(size: 11)).foregroundStyle(.secondary).padding(10).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
     func metric(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(label).font(.system(size: 12)).foregroundStyle(.secondary)
+            Text(L10n.text(label)).font(.system(size: 12)).foregroundStyle(.secondary)
             Text(value).font(.system(size: 24, weight: .medium, design: .rounded)).monospacedDigit().textSelection(.enabled)
         }.padding(16).frame(maxWidth: .infinity, minHeight: 90, alignment: .topLeading).monitorSurface()
     }
     func detail(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top) {
-            Text(label).foregroundStyle(.secondary).frame(width: 180, alignment: .leading)
+            Text(L10n.text(label)).foregroundStyle(.secondary).frame(width: 180, alignment: .leading)
             Text(value).textSelection(.enabled)
         }.font(.system(size: 12))
     }

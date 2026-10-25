@@ -239,18 +239,18 @@ enum Resource: String, CaseIterable, Identifiable {
 
     func subtitle(_ resource: Resource) -> String {
         switch resource {
-        case .cpu: return String(format: "%.0f%%", cpu)
+        case .cpu: return L10n.number("%.0f%%", cpu)
         case .memory: return "\(Self.bytes(memoryUsed)) / \(Self.bytes(memoryTotal))"
-        case .disk: return selectedDiskRates.map { String(format: "%.0f%% de atividade", $0.activeEstimate) } ?? "Aguardando I/O"
-        case .gpu: return selectedGPU?.utilization.map { String(format: "%.0f%%", $0) } ?? "Indisponível"
+        case .disk: return selectedDiskRates.map { L10n.number("%.0f%% de atividade", $0.activeEstimate) } ?? L("Aguardando I/O")
+        case .gpu: return selectedGPU?.utilization.map { L10n.number("%.0f%%", $0) } ?? L("Indisponível")
         case .network: return "↑ \(Self.bytes(sent))/s  ↓ \(Self.bytes(received))/s"
         }
     }
     static func bytes(_ value: Double) -> String {
-        ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .binary)
+        L10n.bytes(value)
     }
     var uptime: String {
         let seconds = Int(ProcessInfo.processInfo.systemUptime)
-        return String(format: "%d:%02d:%02d:%02d", seconds / 86400, seconds / 3600 % 24, seconds / 60 % 60, seconds % 60)
+        return L10n.number("%d:%02d:%02d:%02d", seconds / 86400, seconds / 3600 % 24, seconds / 60 % 60, seconds % 60)
     }
 }

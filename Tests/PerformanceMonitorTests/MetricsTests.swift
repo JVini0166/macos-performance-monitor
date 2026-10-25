@@ -20,7 +20,7 @@ final class MetricsTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(TemperatureReader.decode(type: "flt ", bytes: bytes)), 62.25)
         XCTAssertNil(TemperatureReader.decode(type: "flt ", bytes: [0]))
         XCTAssertNil(TemperatureReader.decode(type: "ui32", bytes: bytes))
-        XCTAssertEqual(TemperatureReading.formatted(nil), "Indisponível")
+        XCTAssertEqual(TemperatureReading.formatted(nil), L10n.text("Indisponível"))
     }
     func testDiskRatesUseIntervalDeltasAndNanoseconds() throws {
         let old = DiskCounters(readBytes: 100, writeBytes: 200, reads: 10, writes: 20, readTime: 100, writeTime: 200)

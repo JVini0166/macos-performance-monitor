@@ -6,6 +6,9 @@ APP="dist/Performance Monitor.app"
 ICONSET=".build/AppIcon.iconset"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$ICONSET"
 cp .build/release/PerformanceMonitor "$APP/Contents/MacOS/PerformanceMonitor"
+RESOURCE_BUNDLE="$(swift build -c release --show-bin-path)/PerformanceMonitor_PerformanceMonitor.bundle"
+# ditto updates the resource bundle without nesting it on repeated builds.
+ditto "$RESOURCE_BUNDLE" "$APP/Contents/Resources/PerformanceMonitor_PerformanceMonitor.bundle"
 for size in 16 32 128 256 512; do
     sips -z "$size" "$size" assets/app-icon.png --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
     retina=$((size * 2))
@@ -18,6 +21,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <plist version="1.0"><dict>
 <key>CFBundleExecutable</key><string>PerformanceMonitor</string>
 <key>CFBundleIdentifier</key><string>dev.josevinicius.performance-monitor</string>
+<key>CFBundleDevelopmentRegion</key><string>en</string>
+<key>CFBundleLocalizations</key><array><string>en</string><string>pt-BR</string></array>
 <key>CFBundleName</key><string>Performance Monitor</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>

@@ -8,8 +8,8 @@ enum MonitorTab: String, CaseIterable, Identifiable {
 
 struct MonitorRootView: View {
     @ObservedObject var metrics: Metrics
-    @StateObject private var processes = ProcessMetrics()
-    @State private var tab: MonitorTab = .processes
+    @ObservedObject var processes: ProcessMetrics
+    @AppStorage("monitorTab") private var tab: MonitorTab = .processes
     var body: some View {
         Group {
             if tab == .performance { PerformanceView(metrics: metrics) }
@@ -17,9 +17,14 @@ struct MonitorRootView: View {
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Picker("Área do monitor", selection: $tab) {
-                    ForEach(MonitorTab.allCases) { Text($0.rawValue).tag($0) }
+                Picker(L("Área do monitor"), selection: $tab) {
+                    ForEach(MonitorTab.allCases) { Text(L10n.text($0.rawValue)).tag($0) }
                 }.pickerStyle(.segmented).frame(width: 240)
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                SettingsLink { Label(L("Ajustes"), systemImage: "gearshape") }.help(L("Idioma e ajustes do aplicativo"))
             }
         }
         .task(id: "\(tab.rawValue):\(metrics.paused)") {

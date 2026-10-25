@@ -5,7 +5,7 @@ struct TemperatureReading {
     let celsius: Double
     let sensors: [String]
     static func formatted(_ reading: Self?) -> String {
-        reading.map { String(format: "%.1f °C", $0.celsius) } ?? "Indisponível"
+        reading.map { L10n.number("%.1f °C", $0.celsius) } ?? L("Indisponível")
     }
 }
 

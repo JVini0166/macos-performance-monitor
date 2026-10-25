@@ -3,16 +3,25 @@ import AppKit
 
 @main struct PerformanceMonitorApp: App {
     @StateObject private var metrics = Metrics()
+    @StateObject private var processes = ProcessMetrics()
+    @AppStorage(L10n.preferenceKey) private var language = AppLanguage.initial.rawValue
     var body: some Scene {
         WindowGroup("Performance Monitor") {
-            MonitorRootView(metrics: metrics)
+            MonitorRootView(metrics: metrics, processes: processes)
+                .environment(\.locale, Locale(identifier: language))
+                .id(language)
                 .frame(minWidth: 900, minHeight: 620)
         }
         .defaultSize(width: 1260, height: 790)
         .windowToolbarStyle(.unified)
         .commands { CommandGroup(after: .newItem) {
-            Button(metrics.paused ? "Retomar gráficos" : "Pausar gráficos") { metrics.paused.toggle() }.keyboardShortcut("p", modifiers: [.command])
-        } }
+            Button(metrics.paused ? L("Retomar gráficos") : L("Pausar gráficos")) { metrics.paused.toggle() }.keyboardShortcut("p", modifiers: [.command])
+        }
+            CommandGroup(replacing: .appSettings) {
+                SettingsLink { Text(L("Ajustes…")) }.keyboardShortcut(",", modifiers: .command)
+            }
+        }
+        Settings { LanguageSettingsView() }
     }
 }
 
@@ -30,7 +39,7 @@ extension Resource {
 
 struct PerformanceView: View {
     @ObservedObject var metrics: Metrics
-    @State private var selection: Resource = .cpu
+    @AppStorage("selectedResource") private var selection: Resource = .cpu
     @AppStorage("logicalProcessors") private var logicalProcessors = false
     @AppStorage("showKernelTimes") private var showKernelTimes = false
     var body: some View {
@@ -44,12 +53,12 @@ struct PerformanceView: View {
                     selection = .disk
                 } else if let resource = Resource(rawValue: value) { selection = resource }
             })) {
-                Section("Recursos do sistema") {
+                Section(L("Recursos do sistema")) {
                     ForEach(Resource.allCases) { resource in
                         if resource == .disk && !metrics.disks.isEmpty {
                             ForEach(Array(metrics.disks.enumerated()), id: \.element.id) { index, disk in
-                                resourceRow(.disk, title: "Disco \(index)",
-                                            subtitle: metrics.diskRates[disk.id].map { String(format: "%.0f%% de atividade", $0.activeEstimate) } ?? "Aguardando I/O",
+                                resourceRow(.disk, title: L("Disco \(index)"),
+                                            subtitle: metrics.diskRates[disk.id].map { L10n.number(L("%.0f%% de atividade"), $0.activeEstimate) } ?? L("Aguardando I/O"),
                                             values: metrics.diskHistory[disk.id] ?? [])
                                     .tag("disk:" + disk.id)
                             }
@@ -69,7 +78,7 @@ struct PerformanceView: View {
                     Image(systemName: "desktopcomputer").font(.title3).foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(metrics.processor).font(.system(size: 11, weight: .medium))
-                        Text("\(metrics.logical) processadores · \(Metrics.bytes(metrics.memoryTotal)) RAM")
+                        Text(L("\(metrics.logical) processadores · \(Metrics.bytes(metrics.memoryTotal)) RAM"))
                             .font(.system(size: 10)).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
@@ -87,29 +96,29 @@ struct PerformanceView: View {
                     RadialGradient(colors: [selection.color.opacity(0.07), .clear], center: .topTrailing, startRadius: 0, endRadius: 650)
                 }.ignoresSafeArea()
             }
-            .navigationTitle(panelTitle)
-            .navigationSubtitle("Monitor de Performance")
+            .navigationTitle(L10n.text(panelTitle))
+            .navigationSubtitle(L("Monitor de Performance"))
             .toolbar {
                 ToolbarItem(placement: .status) { LiveStatus(paused: metrics.paused) }
                 ToolbarItem(placement: .primaryAction) {
                     Button { metrics.paused.toggle() } label: {
-                        Label(metrics.paused ? "Retomar" : "Pausar", systemImage: metrics.paused ? "play.fill" : "pause.fill")
-                    }.help("Pausar ou retomar os gráficos (⌘P)")
+                        Label(metrics.paused ? L("Retomar") : L("Pausar"), systemImage: metrics.paused ? "play.fill" : "pause.fill")
+                    }.help(L("Pausar ou retomar os gráficos (⌘P)"))
                 }
             }
         }
         .tint(.accentColor)
     }
     var panelTitle: String {
-        guard selection == .disk, let index = metrics.disks.firstIndex(where: { $0.id == metrics.selectedDiskID }) else { return selection.rawValue }
-        return "Disco \(index)"
+        guard selection == .disk, let index = metrics.disks.firstIndex(where: { $0.id == metrics.selectedDiskID }) else { return L10n.text(selection.rawValue) }
+        return L("Disco \(index)")
     }
     func resourceRow(_ resource: Resource, title: String, subtitle: String, values: [Double]) -> some View {
         HStack(spacing: 11) {
             Image(systemName: resource.symbol).font(.system(size: 16, weight: .medium))
                 .foregroundStyle(resource.color).frame(width: 26)
             VStack(alignment: .leading, spacing: 5) {
-                Text(title).font(.system(size: 13, weight: .semibold))
+                Text(L10n.text(title)).font(.system(size: 13, weight: .semibold))
                 Text(subtitle).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1).monospacedDigit()
             }
             Spacer(minLength: 0)
@@ -124,7 +133,7 @@ struct PerformanceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(panelTitle).font(.system(size: 28, weight: .semibold, design: .rounded))
+                    Text(L10n.text(panelTitle)).font(.system(size: 28, weight: .semibold, design: .rounded))
                     Spacer(minLength: 16)
                     Text(detailTitle).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.trailing)
                 }.padding(.top, 24).padding(.bottom, 24)
@@ -135,7 +144,7 @@ struct PerformanceView: View {
                         Menu {
                             cpuGraphOptions
                         } label: { Image(systemName: "square.grid.2x2") }
-                        .menuStyle(.borderlessButton).fixedSize().help("Alterar gráfico da CPU; também disponível com clique direito")
+                        .menuStyle(.borderlessButton).fixedSize().help(L("Alterar gráfico da CPU; também disponível com clique direito"))
                     }
                     Text(selection == .network ? "\(Metrics.bytes(maximum(selection)))/s" : selection == .memory ? Metrics.bytes(metrics.memoryTotal) : "100%")
                 }.font(.system(size: 11)).foregroundStyle(.secondary).padding(.bottom, 5)
@@ -144,7 +153,7 @@ struct PerformanceView: View {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: coreColumns), spacing: 10) {
                             ForEach(metrics.coreHistory.indices, id: \.self) { index in
                                 VStack(alignment: .leading, spacing: 4) {
-                                    HStack { Text("CPU \(index)"); Spacer(); Text(String(format: "%.0f%%", metrics.coreUsage[index])) }.font(.system(size: 10)).foregroundStyle(.secondary)
+                                    HStack { Text("CPU \(index)"); Spacer(); Text(L10n.number("%.0f%%", metrics.coreUsage[index])) }.font(.system(size: 10)).foregroundStyle(.secondary)
                                     ZStack {
                                         HistoryGraph(values: metrics.coreHistory[index], color: selection.color, maximum: 100, grid: true)
                                         if showKernelTimes {
@@ -164,16 +173,16 @@ struct PerformanceView: View {
                     }
                 }.padding(16).monitorSurface().contextMenu {
                     if selection == .cpu {
-                        Menu("Alterar gráfico para") { cpuGraphOptions }
-                        Toggle("Mostrar tempos do kernel", isOn: $showKernelTimes)
+                        Menu(L("Alterar gráfico para")) { cpuGraphOptions }
+                        Toggle(L("Mostrar tempos do kernel"), isOn: $showKernelTimes)
                         Divider()
-                        Button("Copiar resumo") {
+                        Button(L("Copiar resumo")) {
                             NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString("CPU: \(metrics.processor)\nUtilização: \(metrics.subtitle(.cpu))\nNúcleos: \(metrics.cores)\nProcessadores lógicos: \(metrics.logical)", forType: .string)
+                            NSPasteboard.general.setString(L("CPU: \(metrics.processor)\nUtilização: \(metrics.subtitle(.cpu))\nNúcleos: \(metrics.cores)\nProcessadores lógicos: \(metrics.logical)"), forType: .string)
                         }
                     }
                 }
-                HStack { Text("60 segundos"); Spacer(); Text("0") }.font(.system(size: 11)).foregroundStyle(.secondary).padding(.top, 6)
+                HStack { Text(L("60 segundos")); Spacer(); Text("0") }.font(.system(size: 11)).foregroundStyle(.secondary).padding(.top, 6)
                 if selection == .disk { diskTransferGraph.padding(.top, 16) }
                 if selection == .memory { memoryComposition.padding(.top, 16) }
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: statistics.count > 4 ? 3 : max(1, statistics.count)), alignment: .leading, spacing: 14) {
@@ -183,7 +192,7 @@ struct PerformanceView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(details, id: \.0) { entry in
                         HStack(alignment: .top) {
-                            Text(entry.0).foregroundStyle(.secondary).frame(width: 170, alignment: .leading)
+                            Text(L10n.text(entry.0)).foregroundStyle(.secondary).frame(width: 170, alignment: .leading)
                             Text(entry.1).textSelection(.enabled)
                         }.font(.system(size: 12))
                     }
@@ -196,34 +205,34 @@ struct PerformanceView: View {
     var coreColumns: Int { metrics.logical <= 4 ? 2 : metrics.logical <= 16 ? 4 : 8 }
     var coreHeight: CGFloat { metrics.logical <= 16 ? 85 : 65 }
     @ViewBuilder var cpuGraphOptions: some View {
-        Button { logicalProcessors = false } label: { Label("Utilização geral", systemImage: logicalProcessors ? "circle" : "checkmark.circle.fill") }
-        Button { logicalProcessors = true } label: { Label("Processadores lógicos", systemImage: logicalProcessors ? "checkmark.circle.fill" : "circle") }
+        Button { logicalProcessors = false } label: { Label(L("Utilização geral"), systemImage: logicalProcessors ? "circle" : "checkmark.circle.fill") }
+        Button { logicalProcessors = true } label: { Label(L("Processadores lógicos"), systemImage: logicalProcessors ? "checkmark.circle.fill" : "circle") }
     }
     var diskTransferMaximum: Double {
         max(1_048_576, max((metrics.diskReadHistory[metrics.selectedDiskID] ?? []).max() ?? 0, (metrics.diskWriteHistory[metrics.selectedDiskID] ?? []).max() ?? 0) * 1.15)
     }
     var diskTransferGraph: some View {
         VStack(spacing: 5) {
-            HStack { Text("Taxa de transferência do disco"); Spacer(); Text("\(Metrics.bytes(diskTransferMaximum))/s") }.font(.system(size: 11)).foregroundStyle(.secondary)
+            HStack { Text(L("Taxa de transferência do disco")); Spacer(); Text("\(Metrics.bytes(diskTransferMaximum))/s") }.font(.system(size: 11)).foregroundStyle(.secondary)
             ZStack {
                 HistoryGraph(values: metrics.diskReadHistory[metrics.selectedDiskID] ?? [], color: Resource.disk.color, maximum: diskTransferMaximum, grid: true, filled: false)
                 HistoryGraph(values: metrics.diskWriteHistory[metrics.selectedDiskID] ?? [], color: Resource.disk.color.opacity(0.7), maximum: diskTransferMaximum, grid: false, filled: false, dashed: true)
             }.frame(height: 95)
-            HStack { Text("60 segundos"); Spacer(); Text("— Leitura    ┄ Escrita") }.font(.system(size: 10)).foregroundStyle(.secondary)
+            HStack { Text(L("60 segundos")); Spacer(); Text(L("— Leitura    ┄ Escrita")) }.font(.system(size: 10)).foregroundStyle(.secondary)
         }.padding(16).monitorSurface()
     }
     var memoryComposition: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("Composição da memória").font(.system(size: 11)).foregroundStyle(.secondary)
+            Text(L("Composição da memória")).font(.system(size: 11)).foregroundStyle(.secondary)
             GeometryReader { geometry in
                 HStack(spacing: 0) {
-                    compositionSegment("Apps (estimativa)", metrics.memoryApps, 0.75, geometry.size.width)
+                    compositionSegment(L("Apps (estimativa)"), metrics.memoryApps, 0.75, geometry.size.width)
                     compositionSegment("Wired", metrics.memoryWired, 1, geometry.size.width)
-                    compositionSegment("Comprimida", metrics.memoryCompressed, 0.5, geometry.size.width)
-                    compositionSegment("Disponível", metrics.memoryAvailable, 0.08, geometry.size.width)
+                    compositionSegment(L("Comprimida"), metrics.memoryCompressed, 0.5, geometry.size.width)
+                    compositionSegment(L("Disponível"), metrics.memoryAvailable, 0.08, geometry.size.width)
                 }
             }.frame(height: 24).clipShape(RoundedRectangle(cornerRadius: 7)).overlay(RoundedRectangle(cornerRadius: 7).stroke(Resource.memory.color.opacity(0.3), lineWidth: 0.5))
-            Text("Apps · Wired · Comprimida · Disponível").font(.system(size: 10)).foregroundStyle(.secondary)
+            Text(L("Apps · Wired · Comprimida · Disponível")).font(.system(size: 10)).foregroundStyle(.secondary)
         }.padding(16).monitorSurface()
     }
     func compositionSegment(_ label: String, _ value: Double, _ opacity: Double, _ width: CGFloat) -> some View {
@@ -232,70 +241,70 @@ struct PerformanceView: View {
     }
     func statistic(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(label).font(.system(size: 12)).foregroundStyle(.secondary)
+            Text(L10n.text(label)).font(.system(size: 12)).foregroundStyle(.secondary)
             Text(value).font(.system(size: 24, weight: .medium, design: .rounded)).monospacedDigit().textSelection(.enabled)
         }.padding(16).frame(maxWidth: .infinity, minHeight: 90, alignment: .topLeading).monitorSurface()
     }
     var graphLabel: String {
         switch selection {
-        case .cpu: return logicalProcessors ? "Utilização por processador lógico" : "% Utilização"
-        case .memory: return "Uso da memória física"
-        case .disk: return "% Tempo ativo"
-        case .gpu: return "% Utilização"
-        case .network: return "Taxa de transferência"
+        case .cpu: return logicalProcessors ? L("Utilização por processador lógico") : L("% Utilização")
+        case .memory: return L("Uso da memória física")
+        case .disk: return L("% Tempo ativo")
+        case .gpu: return L("% Utilização")
+        case .network: return L("Taxa de transferência")
         }
     }
     var detailTitle: String {
         switch selection {
         case .cpu: return metrics.processor
-        case .memory: return "\(Metrics.bytes(metrics.memoryTotal)) de memória física"
-        case .disk: return metrics.selectedDisk?.name ?? "Disco indisponível"
-        case .gpu: return metrics.selectedGPU?.name ?? "GPU indisponível"
-        case .network: return "Interfaces de rede · Total agregado"
+        case .memory: return L("\(Metrics.bytes(metrics.memoryTotal)) de memória física")
+        case .disk: return metrics.selectedDisk?.name ?? L("Disco indisponível")
+        case .gpu: return metrics.selectedGPU?.name ?? L("GPU indisponível")
+        case .network: return L("Interfaces de rede · Total agregado")
         }
     }
     var statistics: [(String, String)] {
         let bytes = Metrics.bytes
         switch selection {
-        case .cpu: return [("Utilização", metrics.subtitle(.cpu)), ("Tempo de atividade", metrics.uptime), ("Temperatura (máxima)", TemperatureReading.formatted(metrics.cpuTemperature))]
+        case .cpu: return [(L("Utilização"), metrics.subtitle(.cpu)), (L("Tempo de atividade"), metrics.uptime), (L("Temperatura (máxima)"), TemperatureReading.formatted(metrics.cpuTemperature))]
         case .memory: return [
-            ("Em uso (comprimida)", "\(bytes(metrics.memoryUsed)) (\(bytes(metrics.memoryCompressed)))"),
-            ("Disponível (estimativa)", bytes(metrics.memoryAvailable)),
-            ("Em cache (estimativa)", bytes(metrics.memoryCached)),
-            ("Swap usado", bytes(metrics.swapUsed)),
-            ("Swap alocado", bytes(metrics.swapTotal)),
-            ("Wired (não paginável)", bytes(metrics.memoryWired))]
+            (L("Em uso (comprimida)"), "\(bytes(metrics.memoryUsed)) (\(bytes(metrics.memoryCompressed)))"),
+            (L("Disponível (estimativa)"), bytes(metrics.memoryAvailable)),
+            (L("Em cache (estimativa)"), bytes(metrics.memoryCached)),
+            (L("Swap usado"), bytes(metrics.swapUsed)),
+            (L("Swap alocado"), bytes(metrics.swapTotal)),
+            (L("Wired (não paginável)"), bytes(metrics.memoryWired))]
         case .disk:
             let rate = metrics.selectedDiskRates
-            return [("Tempo ativo", rate.map { String(format: "%.1f%%", $0.activeEstimate) } ?? "—"),
-                    ("Tempo médio de I/O", rate?.responseMS.map { String(format: "%.2f ms", $0) } ?? "—"),
-                    ("Velocidade de leitura", rate.map { "\(bytes($0.read))/s" } ?? "—"),
-                    ("Velocidade de escrita", rate.map { "\(bytes($0.write))/s" } ?? "—")]
+            return [(L("Tempo ativo"), rate.map { L10n.number("%.1f%%", $0.activeEstimate) } ?? "—"),
+                    (L("Tempo médio de I/O"), rate?.responseMS.map { L10n.number("%.2f ms", $0) } ?? "—"),
+                    (L("Velocidade de leitura"), rate.map { "\(bytes($0.read))/s" } ?? "—"),
+                    (L("Velocidade de escrita"), rate.map { "\(bytes($0.write))/s" } ?? "—")]
         case .gpu: return []
-        case .network: return [("Recebimento", "\(bytes(metrics.received))/s"), ("Envio", "\(bytes(metrics.sent))/s")]
+        case .network: return [(L("Recebimento"), "\(bytes(metrics.received))/s"), (L("Envio"), "\(bytes(metrics.sent))/s")]
         }
     }
     var details: [(String, String)] {
         let bytes = Metrics.bytes
         switch selection {
-        case .cpu: return [("Núcleos:", "\(metrics.cores)"), ("Processadores lógicos:", "\(metrics.logical)"), ("Arquitetura:", Metrics.sysString("hw.machine")), ("Frequência atual:", "Não disponível"), ("Sensores térmicos:", metrics.cpuTemperature.map { "AppleSMC · " + $0.sensors.joined(separator: ", ") } ?? "Indisponíveis neste hardware")]
-        case .memory: return [("Memória física:", bytes(metrics.memoryTotal)), ("Apps (estimativa):", bytes(metrics.memoryApps)),
-                              ("Livre:", bytes(metrics.memoryFree)), ("Swap disponível:", bytes(max(0, metrics.swapTotal - metrics.swapUsed))),
-                              ("Swap de entrada:", "\(bytes(metrics.swapIn))/s"), ("Swap de saída:", "\(bytes(metrics.swapOut))/s")]
-        case .disk: return [("Disco físico:", metrics.selectedDisk?.id ?? "—"),
-                            ("Capacidade:", metrics.selectedDisk.map { bytes($0.capacity) } ?? "—"),
-                            ("Conexão:", metrics.selectedDisk?.connection ?? "—"),
-                            ("Operações por segundo:", metrics.selectedDiskRates.map { String(format: "%.0f IOPS", $0.operations) } ?? "—")]
+        case .cpu: return [(L("Núcleos:"), "\(metrics.cores)"), (L("Processadores lógicos:"), "\(metrics.logical)"), (L("Arquitetura:"), Metrics.sysString("hw.machine")), (L("Frequência atual:"), L("Não disponível")), (L("Sensores térmicos:"), metrics.cpuTemperature.map { "AppleSMC · " + $0.sensors.joined(separator: ", ") } ?? L("Indisponíveis neste hardware"))]
+        case .memory: return [(L("Memória física:"), bytes(metrics.memoryTotal)), (L("Apps (estimativa):"), bytes(metrics.memoryApps)),
+                              (L("Livre:"), bytes(metrics.memoryFree)), (L("Swap disponível:"), bytes(max(0, metrics.swapTotal - metrics.swapUsed))),
+                              (L("Swap de entrada:"), "\(bytes(metrics.swapIn))/s"), (L("Swap de saída:"), "\(bytes(metrics.swapOut))/s")]
+        case .disk: return [(L("Disco físico:"), metrics.selectedDisk?.id ?? "—"),
+                            (L("Capacidade:"), metrics.selectedDisk.map { bytes($0.capacity) } ?? "—"),
+                            (L("Conexão:"), metrics.selectedDisk?.connection ?? "—"),
+                            (L("Operações por segundo:"), metrics.selectedDiskRates.map { L10n.number("%.0f IOPS", $0.operations) } ?? "—")]
         case .gpu: return []
-        case .network: return [("Escopo:", "Interfaces sem loopback"), ("Unidade:", "Bytes por segundo")]
+        case .network: return [(L("Escopo:"), L("Interfaces sem loopback")), (L("Unidade:"), L("Bytes por segundo"))]
         }
     }
     var footnote: String {
         switch selection {
-        case .disk: return "Atividade estimada pela soma dos tempos de I/O ÷ intervalo, limitada a 100%. Operações paralelas podem superestimar o tempo ativo; não equivale ao contador de tempo ocioso do Windows."
-        case .memory: return "Apps, cache e disponível são estimativas a partir das páginas do kernel. Swap é medido diretamente. Committed e pools do Windows não têm equivalência direta no macOS."
-        case .cpu: return showKernelTimes ? "Linha branca tracejada: tempo do kernel · Clique direito para alterar o gráfico" : "Clique direito no gráfico para exibir processadores lógicos ou tempos do kernel"
-        default: return "Amostragem a cada segundo · Histórico de 60 segundos"
+        case .disk: return L("Atividade estimada pela soma dos tempos de I/O ÷ intervalo, limitada a 100%. Operações paralelas podem superestimar o tempo ativo; não equivale ao contador de tempo ocioso do Windows.")
+        case .memory: return L("Apps, cache e disponível são estimativas a partir das páginas do kernel. Swap é medido diretamente. Committed e pools do Windows não têm equivalência direta no macOS.")
+        case .cpu: return showKernelTimes ? L("Linha branca tracejada: tempo do kernel · Clique direito para alterar o gráfico") : L("Clique direito no gráfico para exibir processadores lógicos ou tempos do kernel")
+        default: return L("Amostragem a cada segundo · Histórico de 60 segundos")
         }
     }
 }
@@ -337,6 +346,6 @@ struct HistoryGraph: View {
                 segment.append(CGPoint(x: size.width * Double(index) / Double(values.count - 1), y: size.height * (1 - min(1, max(0, value / max(1, maximum))))))
             }
             drawSegment()
-        }.accessibilityLabel("Gráfico de utilização dos últimos 60 segundos")
+        }.accessibilityLabel(L("Gráfico de utilização dos últimos 60 segundos"))
     }
 }

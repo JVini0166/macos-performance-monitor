@@ -35,8 +35,8 @@ struct LiveStatus: View {
     var body: some View {
         HStack(spacing: 6) {
             Circle().fill(paused ? .orange : .green).frame(width: 6, height: 6)
-            Text(paused ? "Pausado" : "Ao vivo").font(.system(size: 11, weight: .medium))
+            Text(paused ? L("Pausado") : L("Ao vivo")).font(.system(size: 11, weight: .medium))
         }.padding(.horizontal, 12).padding(.vertical, 7).statusGlass()
-            .accessibilityLabel(paused ? "Monitoramento pausado" : "Monitoramento em tempo real")
+            .accessibilityLabel(paused ? L("Monitoramento pausado") : L("Monitoramento em tempo real"))
     }
 }
