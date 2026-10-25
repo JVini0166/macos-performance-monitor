@@ -5,12 +5,11 @@ import AppKit
     @StateObject private var metrics = Metrics()
     var body: some Scene {
         WindowGroup("Performance Monitor") {
-            PerformanceView(metrics: metrics)
-                .preferredColorScheme(.dark)
-                .frame(minWidth: 960, minHeight: 640)
+            MonitorRootView(metrics: metrics)
+                .frame(minWidth: 900, minHeight: 620)
         }
         .defaultSize(width: 1260, height: 790)
-        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified)
         .commands { CommandGroup(after: .newItem) {
             Button(metrics.paused ? "Retomar gráficos" : "Pausar gráficos") { metrics.paused.toggle() }.keyboardShortcut("p", modifiers: [.command])
         } }
@@ -32,62 +31,91 @@ extension Resource {
 struct PerformanceView: View {
     @ObservedObject var metrics: Metrics
     @State private var selection: Resource = .cpu
-    @State private var sidebarVisible = true
     @AppStorage("logicalProcessors") private var logicalProcessors = false
     @AppStorage("showKernelTimes") private var showKernelTimes = false
-    private let background = Color(white: 0.085)
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 14) {
-                Button { sidebarVisible.toggle() } label: { Image(systemName: "sidebar.left") }.buttonStyle(.plain)
-                Image(systemName: "waveform.path.ecg.rectangle").foregroundStyle(.cyan)
-                Text("Performance Monitor").font(.system(size: 14, weight: .medium))
-                Spacer()
-                HStack(spacing: 6) { Circle().fill(metrics.paused ? .orange : .green).frame(width: 6, height: 6); Text(metrics.paused ? "Gráficos pausados" : "Em tempo real").foregroundStyle(.secondary) }.font(.system(size: 11))
-            }.padding(.horizontal, 24).frame(height: 58).background(Color(red: 0.10, green: 0.13, blue: 0.15))
-            HStack(spacing: 0) {
-                if sidebarVisible {
-                    VStack(alignment: .leading, spacing: 22) {
-                        HStack(spacing: 14) { Image(systemName: "waveform.path.ecg"); Text("Performance") }
-                            .font(.system(size: 15, weight: .medium)).padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.white.opacity(0.06)).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 3).fill(.cyan).frame(width: 3, height: 24) }.clipShape(RoundedRectangle(cornerRadius: 6))
-                        Spacer()
-                        Label("macOS · \(ProcessInfo.processInfo.operatingSystemVersionString)", systemImage: "desktopcomputer")
-                            .font(.system(size: 11)).foregroundStyle(.secondary).padding(12)
-                    }.padding(8).frame(width: 200).background(Color(red: 0.105, green: 0.13, blue: 0.16))
-                }
-                VStack(spacing: 0) {
-                    HStack {
-                        Text("Performance").font(.system(size: 17, weight: .semibold))
-                        Spacer()
-                        Button { metrics.paused.toggle() } label: { Label(metrics.paused ? "Retomar" : "Pausar", systemImage: metrics.paused ? "play" : "pause") }.buttonStyle(.plain)
-                            .help("Pausar ou retomar os gráficos (⌘P)")
-                    }.padding(.horizontal, 24).frame(height: 59).background(Color(white: 0.13))
-                    Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
-                    HStack(alignment: .top, spacing: 26) {
-                        VStack(spacing: 8) {
-                            ForEach(Resource.allCases) { resource in
-                                Button { selection = resource } label: {
-                                    HStack(spacing: 12) {
-                                        HistoryGraph(values: resource == .disk ? metrics.diskHistory[metrics.selectedDiskID] ?? [] : resource == .gpu ? metrics.gpuHistory(.overall) : metrics.history[resource] ?? [], color: resource.color, maximum: maximum(resource), grid: false)
-                                            .frame(width: 76, height: 51).background(Color.white.opacity(0.035)).overlay(Rectangle().stroke(resource.color.opacity(0.35), lineWidth: 0.5))
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            Text(resource.rawValue).font(.system(size: 18))
-                                            Text(metrics.subtitle(resource)).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2)
-                                        }.frame(maxWidth: .infinity, alignment: .leading)
-                                    }.padding(12).frame(height: 87).background(selection == resource ? Color.white.opacity(0.075) : .clear).clipShape(RoundedRectangle(cornerRadius: 4))
-                                }.buttonStyle(.plain)
+        NavigationSplitView {
+            List(selection: Binding<String?>(get: {
+                selection == .disk && !metrics.selectedDiskID.isEmpty ? "disk:" + metrics.selectedDiskID : selection.rawValue
+            }, set: { value in
+                guard let value else { return }
+                if value.hasPrefix("disk:") {
+                    metrics.selectedDiskID = String(value.dropFirst(5))
+                    selection = .disk
+                } else if let resource = Resource(rawValue: value) { selection = resource }
+            })) {
+                Section("Recursos do sistema") {
+                    ForEach(Resource.allCases) { resource in
+                        if resource == .disk && !metrics.disks.isEmpty {
+                            ForEach(Array(metrics.disks.enumerated()), id: \.element.id) { index, disk in
+                                resourceRow(.disk, title: "Disco \(index)",
+                                            subtitle: metrics.diskRates[disk.id].map { String(format: "%.0f%% de atividade", $0.activeEstimate) } ?? "Aguardando I/O",
+                                            values: metrics.diskHistory[disk.id] ?? [])
+                                    .tag("disk:" + disk.id)
                             }
-                            Spacer()
-                        }.frame(width: 228)
-                        Group {
-                            if selection == .gpu { GPUPerformanceView(metrics: metrics) }
-                            else { detail }
-                        }.padding(.trailing, 24)
-                    }.padding(.top, 18).padding(.leading, 10)
-                }.background(background)
+                        } else {
+                            resourceRow(resource, title: resource.rawValue, subtitle: metrics.subtitle(resource),
+                                        values: resource == .gpu ? metrics.gpuHistory(.overall) : metrics.history[resource] ?? [])
+                                .tag(resource.rawValue)
+                        }
+                    }
+                }
             }
-        }.foregroundStyle(Color(white: 0.94))
+            .listStyle(.sidebar)
+            .navigationTitle("Performance Monitor")
+            .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 300)
+            .safeAreaInset(edge: .bottom) {
+                HStack(spacing: 10) {
+                    Image(systemName: "desktopcomputer").font(.title3).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(metrics.processor).font(.system(size: 11, weight: .medium))
+                        Text("\(metrics.logical) processadores · \(Metrics.bytes(metrics.memoryTotal)) RAM")
+                            .font(.system(size: 10)).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }.padding(16)
+            }
+        } detail: {
+            Group {
+                if selection == .gpu { GPUPerformanceView(metrics: metrics) }
+                else { detail }
+            }
+            .padding(.horizontal, 28)
+            .background {
+                ZStack(alignment: .topTrailing) {
+                    Color(nsColor: .windowBackgroundColor)
+                    RadialGradient(colors: [selection.color.opacity(0.07), .clear], center: .topTrailing, startRadius: 0, endRadius: 650)
+                }.ignoresSafeArea()
+            }
+            .navigationTitle(panelTitle)
+            .navigationSubtitle("Monitor de Performance")
+            .toolbar {
+                ToolbarItem(placement: .status) { LiveStatus(paused: metrics.paused) }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { metrics.paused.toggle() } label: {
+                        Label(metrics.paused ? "Retomar" : "Pausar", systemImage: metrics.paused ? "play.fill" : "pause.fill")
+                    }.help("Pausar ou retomar os gráficos (⌘P)")
+                }
+            }
+        }
+        .tint(.accentColor)
+    }
+    var panelTitle: String {
+        guard selection == .disk, let index = metrics.disks.firstIndex(where: { $0.id == metrics.selectedDiskID }) else { return selection.rawValue }
+        return "Disco \(index)"
+    }
+    func resourceRow(_ resource: Resource, title: String, subtitle: String, values: [Double]) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: resource.symbol).font(.system(size: 16, weight: .medium))
+                .foregroundStyle(resource.color).frame(width: 26)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title).font(.system(size: 13, weight: .semibold))
+                Text(subtitle).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1).monospacedDigit()
+            }
+            Spacer(minLength: 0)
+            HistoryGraph(values: values, color: resource.color, maximum: maximum(resource), grid: false)
+                .frame(width: 46, height: 26).accessibilityHidden(true)
+        }.padding(.vertical, 10)
     }
     func maximum(_ resource: Resource) -> Double {
         resource == .network ? max(1024, (metrics.history[.network] ?? []).max() ?? 0) * 1.15 : 100
@@ -96,15 +124,10 @@ struct PerformanceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(selection.rawValue).font(.system(size: 35, weight: .regular))
+                    Text(panelTitle).font(.system(size: 28, weight: .semibold, design: .rounded))
                     Spacer(minLength: 16)
-                    Text(detailTitle).font(.system(size: 15)).lineLimit(2).multilineTextAlignment(.trailing)
-                }.padding(.top, 5).padding(.bottom, 18)
-                if selection == .disk, !metrics.disks.isEmpty {
-                    Picker("Disco físico", selection: $metrics.selectedDiskID) {
-                        ForEach(metrics.disks) { disk in Text("\(disk.id) · \(disk.name)").tag(disk.id) }
-                    }.pickerStyle(.menu).frame(maxWidth: 380).padding(.bottom, 12)
-                }
+                    Text(detailTitle).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.trailing)
+                }.padding(.top, 24).padding(.bottom, 24)
                 HStack {
                     Text(graphLabel)
                     Spacer()
@@ -125,21 +148,21 @@ struct PerformanceView: View {
                                     ZStack {
                                         HistoryGraph(values: metrics.coreHistory[index], color: selection.color, maximum: 100, grid: true)
                                         if showKernelTimes {
-                                            HistoryGraph(values: metrics.coreKernelHistory[index], color: .white.opacity(0.8), maximum: 100, grid: false, filled: false, dashed: true)
+                                            HistoryGraph(values: metrics.coreKernelHistory[index], color: .primary.opacity(0.65), maximum: 100, grid: false, filled: false, dashed: true)
                                         }
                                     }
-                                }.frame(height: coreHeight)
+                                }.padding(10).frame(height: coreHeight + 20).background(selection.color.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
                             }
                         }
                     } else {
                         ZStack {
                             HistoryGraph(values: selection == .disk ? metrics.diskHistory[metrics.selectedDiskID] ?? [] : metrics.history[selection] ?? [], color: selection.color, maximum: maximum(selection), grid: true)
                             if selection == .cpu && showKernelTimes {
-                                HistoryGraph(values: metrics.kernelHistory, color: .white.opacity(0.8), maximum: 100, grid: false, filled: false, dashed: true)
+                                HistoryGraph(values: metrics.kernelHistory, color: .primary.opacity(0.65), maximum: 100, grid: false, filled: false, dashed: true)
                             }
                         }.frame(height: selection == .disk ? 165 : selection == .memory ? 220 : 300)
                     }
-                }.contextMenu {
+                }.padding(16).monitorSurface().contextMenu {
                     if selection == .cpu {
                         Menu("Alterar gráfico para") { cpuGraphOptions }
                         Toggle("Mostrar tempos do kernel", isOn: $showKernelTimes)
@@ -153,10 +176,10 @@ struct PerformanceView: View {
                 HStack { Text("60 segundos"); Spacer(); Text("0") }.font(.system(size: 11)).foregroundStyle(.secondary).padding(.top, 6)
                 if selection == .disk { diskTransferGraph.padding(.top, 16) }
                 if selection == .memory { memoryComposition.padding(.top, 16) }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 155), alignment: .leading)], alignment: .leading, spacing: 18) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: statistics.count > 4 ? 3 : max(1, statistics.count)), alignment: .leading, spacing: 14) {
                     ForEach(statistics, id: \.0) { entry in statistic(entry.0, entry.1) }
                 }.padding(.top, 22)
-                Divider().padding(.vertical, 18)
+                Color.clear.frame(height: 20)
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(details, id: \.0) { entry in
                         HStack(alignment: .top) {
@@ -165,6 +188,7 @@ struct PerformanceView: View {
                         }.font(.system(size: 12))
                     }
                 }
+                .padding(20).frame(maxWidth: .infinity, alignment: .leading).monitorSurface()
                 Text(footnote).font(.system(size: 10)).foregroundStyle(.tertiary).padding(.top, 18).padding(.bottom, 20)
             }
         }
@@ -186,7 +210,7 @@ struct PerformanceView: View {
                 HistoryGraph(values: metrics.diskWriteHistory[metrics.selectedDiskID] ?? [], color: Resource.disk.color.opacity(0.7), maximum: diskTransferMaximum, grid: false, filled: false, dashed: true)
             }.frame(height: 95)
             HStack { Text("60 segundos"); Spacer(); Text("— Leitura    ┄ Escrita") }.font(.system(size: 10)).foregroundStyle(.secondary)
-        }
+        }.padding(16).monitorSurface()
     }
     var memoryComposition: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -198,9 +222,9 @@ struct PerformanceView: View {
                     compositionSegment("Comprimida", metrics.memoryCompressed, 0.5, geometry.size.width)
                     compositionSegment("Disponível", metrics.memoryAvailable, 0.08, geometry.size.width)
                 }
-            }.frame(height: 32).overlay(Rectangle().stroke(Resource.memory.color, lineWidth: 1))
+            }.frame(height: 24).clipShape(RoundedRectangle(cornerRadius: 7)).overlay(RoundedRectangle(cornerRadius: 7).stroke(Resource.memory.color.opacity(0.3), lineWidth: 0.5))
             Text("Apps · Wired · Comprimida · Disponível").font(.system(size: 10)).foregroundStyle(.secondary)
-        }
+        }.padding(16).monitorSurface()
     }
     func compositionSegment(_ label: String, _ value: Double, _ opacity: Double, _ width: CGFloat) -> some View {
         Rectangle().fill(Resource.memory.color.opacity(opacity)).frame(width: width * value / metrics.memoryTotal)
@@ -209,14 +233,14 @@ struct PerformanceView: View {
     func statistic(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label).font(.system(size: 12)).foregroundStyle(.secondary)
-            Text(value).font(.system(size: 23, weight: .regular)).monospacedDigit().textSelection(.enabled)
-        }
+            Text(value).font(.system(size: 24, weight: .medium, design: .rounded)).monospacedDigit().textSelection(.enabled)
+        }.padding(16).frame(maxWidth: .infinity, minHeight: 90, alignment: .topLeading).monitorSurface()
     }
     var graphLabel: String {
         switch selection {
         case .cpu: return logicalProcessors ? "Utilização por processador lógico" : "% Utilização"
         case .memory: return "Uso da memória física"
-        case .disk: return "% Tempo ativo (estimativa)"
+        case .disk: return "% Tempo ativo"
         case .gpu: return "% Utilização"
         case .network: return "Taxa de transferência"
         }
@@ -243,7 +267,7 @@ struct PerformanceView: View {
             ("Wired (não paginável)", bytes(metrics.memoryWired))]
         case .disk:
             let rate = metrics.selectedDiskRates
-            return [("Tempo ativo (estimativa)", rate.map { String(format: "%.1f%%", $0.activeEstimate) } ?? "—"),
+            return [("Tempo ativo", rate.map { String(format: "%.1f%%", $0.activeEstimate) } ?? "—"),
                     ("Tempo médio de I/O", rate?.responseMS.map { String(format: "%.2f ms", $0) } ?? "—"),
                     ("Velocidade de leitura", rate.map { "\(bytes($0.read))/s" } ?? "—"),
                     ("Velocidade de escrita", rate.map { "\(bytes($0.write))/s" } ?? "—")]
@@ -283,13 +307,14 @@ struct HistoryGraph: View {
     let grid: Bool
     var filled = true
     var dashed = false
+    @Environment(\.colorScheme) private var colorScheme
     var body: some View {
         Canvas { context, size in
             if grid {
                 var lines = Path()
-                for column in 0...15 { let x = size.width * Double(column) / 15; lines.move(to: CGPoint(x: x, y: 0)); lines.addLine(to: CGPoint(x: x, y: size.height)) }
-                for row in 0...10 { let y = size.height * Double(row) / 10; lines.move(to: CGPoint(x: 0, y: y)); lines.addLine(to: CGPoint(x: size.width, y: y)) }
-                context.stroke(lines, with: .color(color.opacity(0.16)), lineWidth: 0.6)
+                for column in 0...10 { let x = size.width * Double(column) / 10; lines.move(to: CGPoint(x: x, y: 0)); lines.addLine(to: CGPoint(x: x, y: size.height)) }
+                for row in 0...5 { let y = size.height * Double(row) / 5; lines.move(to: CGPoint(x: 0, y: y)); lines.addLine(to: CGPoint(x: size.width, y: y)) }
+                context.stroke(lines, with: .color(.secondary.opacity(0.12)), style: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
             }
             guard values.count > 1 else { return }
             var segment: [CGPoint] = []
@@ -303,9 +328,9 @@ struct HistoryGraph: View {
                     fill.addLine(to: CGPoint(x: last.x, y: size.height))
                     fill.addLine(to: CGPoint(x: first.x, y: size.height))
                     fill.closeSubpath()
-                    context.fill(fill, with: .color(color.opacity(grid ? 0.56 : 0.46)))
+                    context.fill(fill, with: .linearGradient(Gradient(colors: [color.opacity(colorScheme == .dark ? 0.42 : 0.28), color.opacity(0.025)]), startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)))
                 }
-                context.stroke(line, with: .color(color), style: StrokeStyle(lineWidth: grid ? 1.4 : 1, dash: dashed ? [4, 3] : []))
+                context.stroke(line, with: .color(color), style: StrokeStyle(lineWidth: grid ? 1.8 : 1.2, dash: dashed ? [4, 3] : []))
             }
             for (index, value) in values.enumerated() {
                 guard value.isFinite else { drawSegment(); segment.removeAll(keepingCapacity: true); continue }

@@ -241,7 +241,7 @@ enum Resource: String, CaseIterable, Identifiable {
         switch resource {
         case .cpu: return String(format: "%.0f%%", cpu)
         case .memory: return "\(Self.bytes(memoryUsed)) / \(Self.bytes(memoryTotal))"
-        case .disk: return selectedDiskRates.map { String(format: "%.0f%% atividade (est.)", $0.activeEstimate) } ?? "Aguardando I/O"
+        case .disk: return selectedDiskRates.map { String(format: "%.0f%% de atividade", $0.activeEstimate) } ?? "Aguardando I/O"
         case .gpu: return selectedGPU?.utilization.map { String(format: "%.0f%%", $0) } ?? "Indisponível"
         case .network: return "↑ \(Self.bytes(sent))/s  ↓ \(Self.bytes(received))/s"
         }

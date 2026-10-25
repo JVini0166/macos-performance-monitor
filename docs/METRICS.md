@@ -57,3 +57,13 @@ Referências adicionais:
 - [Apple: memória Metal alocada pelo processo](https://developer.apple.com/documentation/metal/mtldevice/currentallocatedsize)
 - [Stats: catálogo de identificadores de sensores por modelo](https://github.com/exelban/stats/blob/master/Modules/Sensors/values.swift)
 - [SMCKit: referência do protocolo AppleSMC](https://github.com/beltex/SMCKit/blob/master/SMCKit/SMC.swift)
+
+## Processos
+
+A lista é obtida com `proc_listallpids` e `proc_pidinfo`. Identidade combina PID e horário de início (`pbi_start_tvsec`/`pbi_start_tvusec`), evitando misturar contadores de PIDs reutilizados. `proc_pid_rusage` com `RUSAGE_INFO_V2` fornece CPU acumulada (usuário + sistema, em ticks Mach convertidos para nanossegundos por `mach_timebase_info`), physical footprint e bytes de I/O. CPU e taxas de disco são deltas divididos pelo tempo monotônico entre as leituras; não se usa a idade total do processo. CPU não é dividida pela quantidade de processadores lógicos: 100% corresponde a um processador, como no Monitor de Atividade. RAM usa physical footprint quando disponível, com fallback para memória residente via `PROC_PIDTASKINFO`.
+
+Aplicativos são os processos registrados no NSWorkspace com `activationPolicy == regular`; seus helpers continuam na categoria segundo plano. Ícones e nomes amigáveis vêm do NSWorkspace. Não há soma de filhos nem inferência de GPU/rede por processo. O estado é a classificação BSD da última amostra. Leituras sem permissão permanecem indisponíveis. Amostragem ocorre em tarefa de utilidade a cada dois segundos, apenas na aba Processos; a pausa limpa a base antes de retomar. Ações de encerrar conferem novamente a identidade e UID, recusam PID 1 e o próprio monitor e enviam SIGTERM ou SIGKILL somente após confirmação na UI.
+
+- [Apple: tabelas SwiftUI](https://developer.apple.com/documentation/swiftui/table)
+- [Apple: implementação libproc](https://github.com/apple-oss-distributions/xnu/blob/main/libsyscall/wrappers/libproc/libproc.c)
+- [Apple: preenchimento dos contadores de processos](https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/bsd_kern.c)
